@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Controller\AppController;
+use phpDocumentor\Reflection\Types\This;
 
 /**
  * Product Controller
@@ -20,56 +21,22 @@ class ProductController extends AppController
      */
     public function index()
     {
-        $product = $this->Product->find('all');
+        // $product = $this->Product->find('all');
 
-        $this->set(compact('product'));
+        // $this->set(compact('product'));
     }
 
     public function getData()
     {
-
         $this->autoRender = false;
 
         //get the search value from dataTables request
         $searchQueryValue = $this->request->getQuery('search')['value'];
 
-        //PROCEED WITH THE MANUAL QUERY FOR THE DATATABLES
-
-        // CHECK SA NETWORK TAB UNG PAYLOAD ANDON MGA DETAILS NG DATATABLES REQUEST
-        //COLUMNS
-        // 0 - product_id
-        // 1 - name
-        // 2 - price
-        // 3 - stock_quantity
-        // 4 - category
-        // 5 - none
-
-        //get column index
-        $columnIndex = $this->request->getQuery('order')[0]['column'];
-        //get column name from column index 
-        $columnName = $this->request->getQuery('columns')[$columnIndex]['data'];
-
-        //CAST muna to char ung price, product_id, stock_quantity para ma search, mag error pag hindi cinast
-
-        $product = $this->Product->find()->where([
-            'OR' => [
-                ['name LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(price as char) LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(product_id as char) LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(stock_quantity as char) LIKE' => "%{$searchQueryValue}%"],
-                ['category LIKE' => "%{$searchQueryValue}%"]
-            ]
-        ])->order([$columnName => $this->request->getQuery('order')[0]['dir']])->limit($this->request->getQuery('length'))->offset($this->request->getQuery('start'))->toArray();
-
-        $count = $this->Product->find()->where([
-            'OR' => [
-                ['name LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(price as char) LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(product_id as char) LIKE' => "%{$searchQueryValue}%"],
-                ['CAST(stock_quantity as char) LIKE' => "%{$searchQueryValue}%"],
-                ['category LIKE' => "%{$searchQueryValue}%"]
-            ]
-        ])->order([$columnName => $this->request->getQuery('order')[0]['dir']])->limit($this->request->getQuery('length'))->offset($this->request->getQuery('start'))->count();
+        //return to Array para array ang result 
+        $product = $this->handleQuery($searchQueryValue)->toArray();
+        //eto naman para sa count for pagination
+        $count = $this->handleQuery($searchQueryValue)->count();
 
         //Modify data para sa structure ng datatables
         //array_values para ung "0": {data..} na structure ng data e maging array na lang.
@@ -81,11 +48,9 @@ class ProductController extends AppController
             'data' => array_values($product)
         ];
 
-        $this->response->type('application/json');
-
-        $this->response->body(json_encode($modifiedData));
-
-        return $this->response;
+        // $this->response = $this->response->withType('application/json')->withStringBody(json_encode($modifiedData));
+        //set muna response header application json then convert sa json ung modifieddata
+        return $this->response->withType('application/json')->withStringBody(json_encode($modifiedData));
     }
 
     /**
@@ -291,5 +256,36 @@ class ProductController extends AppController
         $product->price = (int)$content[2];
         $product->stock_quantity = (int)$content[3];
         $product->category = $content[4];
+    }
+
+    private function handleQuery($searchQueryValue)
+    {
+        //PROCEED WITH THE MANUAL QUERY FOR THE DATATABLES
+        //CHECK SA NETWORK TAB UNG PAYLOAD ANDON MGA DETAILS NG DATATABLES REQUEST
+        //YUNG IBANG MGA GAMIT FOR SORTING PAGINATION ETC UN UNG MGA NAKA GETQUERY SA REQUEST LIKE ORDER START LENGTH ETC
+        //COLUMNS
+        // 0 - product_id
+        // 1 - name
+        // 2 - price
+        // 3 - stock_quantity
+        // 4 - category
+        // 5 - none
+
+        //get column index
+        $columnIndex = $this->request->getQuery('order')[0]['column'];
+        //get column name from column index 
+        $columnName = $this->request->getQuery('columns')[$columnIndex]['data'];
+
+        //CAST muna to char ung price, product_id, stock_quantity para ma search, mag error pag hindi cinast
+
+        return  $this->Product->find()->where([
+            'OR' => [
+                ['name LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(price as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(product_id as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(stock_quantity as char) LIKE' => "%{$searchQueryValue}%"],
+                ['category LIKE' => "%{$searchQueryValue}%"]
+            ]
+        ])->order([$columnName => $this->request->getQuery('order')[0]['dir']])->limit($this->request->getQuery('length'))->offset($this->request->getQuery('start'));
     }
 }

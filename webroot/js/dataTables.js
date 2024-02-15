@@ -1,7 +1,7 @@
 $(document).ready(function () {
     $("#dataTable").DataTable({
         ajax: {
-            url: "/product/getData",
+            url: "/product/getdata",
             dataSrc: "data",
         },
         processing: true,
