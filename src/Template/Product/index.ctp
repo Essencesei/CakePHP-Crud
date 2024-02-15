@@ -16,15 +16,38 @@
 </nav>
 <div class="product index large-9 medium-8 columns content">
     <h3><?= __('Product') ?></h3>
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped">
+    <table id="dataTable" class=" compact stripe" style="width:100%">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Stock Quantity</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tfoot>
+            <tr>
+                <th>Product ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Stock Quantity</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- <div class="table-responsive">
+        <table id="dataTables" class="">
             <thead>
                 <tr>
-                    <th scope="col"><?= $this->Paginator->sort('product_id') ?></th>
-                    <th scope="col"><?= $this->Paginator->sort('name') ?></th>
-                    <th scope="col"><?= $this->Paginator->sort('price') ?></th>
-                    <th scope="col"><?= $this->Paginator->sort('stock_quantity') ?></th>
-                    <th scope="col"><?= $this->Paginator->sort('category') ?></th>
+                    <th scope="col"><?= __('Product ID') ?></th>
+                    <th scope="col"><?= __('Name') ?></th>
+                    <th scope="col"><?= __('Price') ?></th>
+                    <th scope="col"><?= __('Stock Quantity') ?></th>
+                    <th scope="col"><?= __('Category') ?></th>
                     <th scope="col" class="actions"><?= __('Actions') ?></th>
                 </tr>
             </thead>
@@ -33,7 +56,7 @@
                     <tr>
                         <td><?= $this->Number->format($product->product_id) ?></td>
                         <td><?= h($product->name) ?></td>
-                        <td><?= $this->Number->format($product->price) ?></td>
+                        <td><?= $this->Number->currency($product->price, 'PHP') ?></td>
                         <td><?= $this->Number->format($product->stock_quantity) ?></td>
                         <td><?= h($product->category) ?></td>
                         <td class="actions text-center">
@@ -45,18 +68,14 @@
                 <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
+    </div> -->
 
-    <div class="paginator">
-        <p class="fs-4"><?= $this->Paginator->counter(['format' => __('Page {{page}} of {{pages}}, showing {{current}} record(s) out of {{count}} total')]) ?></p>
-        <ul class="pagination justify-content-center">
-            <?= $this->Paginator->first('<< ') ?>
-            <?= $this->Paginator->prev('< ') ?>
-            <?= $this->Paginator->numbers() ?>
-            <?= $this->Paginator->next(' >') ?>
-            <?= $this->Paginator->last(' >>') ?>
-        </ul>
+    <script type="text/javascript">
+        //GLOBAL VARIABLE return neto ung mismong url para magamit sa dataTables.js para sa url
+        var editUrl = "<?php echo $this->Url->build(['controller' => 'Product', 'action' => 'edit']); ?>";
+        var viewUrl = "<?php echo $this->Url->build(['controller' => 'Product', 'action' => 'view']); ?>";
+    </script>
 
-    </div>
-</div>
+
+
 </div>

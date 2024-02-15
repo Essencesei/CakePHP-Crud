@@ -54,7 +54,7 @@ class ProductFixture extends TestFixture
                 'stock_quantity' => 1,
                 'category' => 'Lorem ipsum dolor sit amet',
                 'image_url' => 'Lorem ipsum dolor sit amet',
-                'created_at' => 1707804843,
+                'created_at' => 1707972798,
             ],
         ];
         parent::init();

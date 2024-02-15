@@ -20,9 +20,72 @@ class ProductController extends AppController
      */
     public function index()
     {
-        $product = $this->paginate($this->Product, ['limit' => 5]);
+        $product = $this->Product->find('all');
 
         $this->set(compact('product'));
+    }
+
+    public function getData()
+    {
+
+        $this->autoRender = false;
+
+        //get the search value from dataTables request
+        $searchQueryValue = $this->request->getQuery('search')['value'];
+
+        //PROCEED WITH THE MANUAL QUERY FOR THE DATATABLES
+
+        // CHECK SA NETWORK TAB UNG PAYLOAD ANDON MGA DETAILS NG DATATABLES REQUEST
+        //COLUMNS
+        // 0 - product_id
+        // 1 - name
+        // 2 - price
+        // 3 - stock_quantity
+        // 4 - category
+        // 5 - none
+
+        //get column index
+        $columnIndex = $this->request->getQuery('order')[0]['column'];
+        //get column name from column index 
+        $columnName = $this->request->getQuery('columns')[$columnIndex]['data'];
+
+        //CAST muna to char ung price, product_id, stock_quantity para ma search, mag error pag hindi cinast
+
+        $product = $this->Product->find()->where([
+            'OR' => [
+                ['name LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(price as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(product_id as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(stock_quantity as char) LIKE' => "%{$searchQueryValue}%"],
+                ['category LIKE' => "%{$searchQueryValue}%"]
+            ]
+        ])->order([$columnName => $this->request->getQuery('order')[0]['dir']])->limit($this->request->getQuery('length'))->offset($this->request->getQuery('start'))->toArray();
+
+        $count = $this->Product->find()->where([
+            'OR' => [
+                ['name LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(price as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(product_id as char) LIKE' => "%{$searchQueryValue}%"],
+                ['CAST(stock_quantity as char) LIKE' => "%{$searchQueryValue}%"],
+                ['category LIKE' => "%{$searchQueryValue}%"]
+            ]
+        ])->order([$columnName => $this->request->getQuery('order')[0]['dir']])->limit($this->request->getQuery('length'))->offset($this->request->getQuery('start'))->count();
+
+        //Modify data para sa structure ng datatables
+        //array_values para ung "0": {data..} na structure ng data e maging array na lang.
+
+        $modifiedData = [
+            'draw' => $this->request->getQuery('draw'),
+            'recordsTotal' => $this->Product->find()->count(),
+            'recordsFiltered' => $count,
+            'data' => array_values($product)
+        ];
+
+        $this->response->type('application/json');
+
+        $this->response->body(json_encode($modifiedData));
+
+        return $this->response;
     }
 
     /**
@@ -119,62 +182,74 @@ class ProductController extends AppController
     {
         $file = $this->request->getUploadedFile('file');
         if (!empty($file)) {
-            $path = WWW_ROOT . 'uploads' . DS . 'csv' . DS . $file->getClientFilename();
-            $file->moveTo($path);
-            $file = fopen($path, 'r');
 
-            //transactional method para rollback if may error along the way
+            if ($file && $file->getError() === UPLOAD_ERR_OK) {
+                $path = WWW_ROOT . 'uploads' . DS . 'csv' . DS . $file->getClientFilename();
+                $file->moveTo($path);
+                $file = fopen($path, 'r');
 
-            $this->Product->getConnection()->transactional(function () use ($file) {
-                $firstLine = true; // Flag to skip the first line
+                //transactional method para rollback if may error along the way
+                $this->Product->getConnection()->transactional(function () use ($file) {
+                    $firstLine = true; // Flag to skip the first line, since row 1 is header.
 
-                while (!feof($file)) {
-                    $content = fgetcsv($file);
-                    // dd($content);
-                    if ($firstLine) {
-                        $firstLine = false;
-                        continue;
+                    while (!feof($file)) {
+                        $content = fgetcsv($file);
+                        // dd($content);
+                        if ($firstLine) {
+                            $firstLine = false;
+                            continue; // di mag pproceed ung first iteration mag loloop lang ulit.
+                        }
+
+                        $product = $this->Product->newEntity();
+                        // dd(count($content));
+
+                        // Look for better logic to validate the csv file. 
+                        if (count($content) >= 6 || count($content) <= 4) {
+                            $this->Flash->error(__('Invalid CSV file. Please, try again.'));
+                            return false;
+                        }
+
+                        $this->handleCsvData($product, $content);
+
+                        if (!$this->Product->save($product)) {
+                            $this->Flash->error(__('The product could not be saved. Please, try again.'));
+                            return false;
+                        }
                     }
+                    $this->Flash->success(__('Csv file has been imported.'));
+                    return true;
+                });
 
-                    $product = $this->Product->newEntity();
-                    // dd(count($content));
+                fclose($file);
+            } else {
+                $csv = $this->request->getData('text');
+                // dd(str_getcsv($csv, "\n"));
+                $csv_rows = str_getcsv($csv, "\n");
+                //remove header
+                $header = array_shift($csv_rows);
 
-                    // Look for better logic to validate the csv file. 
-                    if (count($content) >= 6 || count($content) <= 4) {
-                        $this->Flash->error(__('Invalid CSV file. Please, try again.'));
-                        return false;
+
+
+                $this->Product->getConnection()->transactional(function () use ($csv_rows) {
+
+                    foreach ($csv_rows as $row) {
+                        $data = str_getcsv($row);
+
+                        $product = $this->Product->newEntity();
+                        $this->handleCsvData($product, $data);
+                        if (!$this->Product->save($product)) {
+                            $this->Flash->error(__('The product could not be saved. Please, try again.'));
+                            return false;
+                        }
                     }
-
-                    // $this->Product->patchEntity($product, $content);
-
-                    // Indexes of the csv file
-                    // 0 - name
-                    // 1 - description
-                    // 2 - price
-                    // 3 - stock_quantity
-                    // 4 - category
-                    // 5 - image_url
-                    // 6 - created_at
-
-                    $product->name = $content[0];
-                    $product->description = $content[1];
-                    $product->price = (int)$content[2];
-                    $product->stock_quantity = (int)$content[3];
-                    $product->category = $content[4];
-
-                    if (!$this->Product->save($product)) {
-                        $this->Flash->error(__('The product could not be saved. Please, try again.'));
-                        return false;
-                    }
-                }
-                $this->Flash->success(__('The products has been imported.'));
-                return true;
-            });
-
-            fclose($file);
+                    $this->Flash->success(__('Pasted csv text has been imported.'));
+                    return true;
+                });
+            }
 
             $this->redirect(['action' => 'index']);
         }
+
         $this->set('file', $file);
     }
 
@@ -195,6 +270,26 @@ class ProductController extends AppController
             $fileName = $file->getClientFilename();
             $file->moveTo(WWW_ROOT . 'uploads' . DS . 'images' . DS . $fileName);
             return $fileName;
+        } else {
+            return null;
         }
+    }
+
+    private function handleCsvData($product, $content)
+    {
+        // Indexes of the csv file
+        // 0 - name
+        // 1 - description
+        // 2 - price
+        // 3 - stock_quantity
+        // 4 - category
+        // 5 - image_url
+        // 6 - created_at
+
+        $product->name = $content[0];
+        $product->description = $content[1];
+        $product->price = (int)$content[2];
+        $product->stock_quantity = (int)$content[3];
+        $product->category = $content[4];
     }
 }
