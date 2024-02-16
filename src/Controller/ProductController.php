@@ -164,6 +164,7 @@ class ProductController extends AppController
                             $firstLine = false;
                             continue; // di mag pproceed ung first iteration mag loloop lang ulit.
                         }
+                        //dapat mahandle ung error pag walang kasunod na data
 
                         $product = $this->Product->newEntity();
                         // dd(count($content));
