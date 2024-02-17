@@ -145,7 +145,12 @@ class ProductController extends AppController
 
     public function import()
     {
+
         $file = $this->request->getUploadedFile('file');
+        $isError = false; //EMPTY FLAG SET TO TRUE IF EMPTY TAS VALIDATE FOR ERROR FLASH
+        $numberofloop = 0; // COUNTER FOR NUMBER OF LOOP PAG LESS THAN OR EQUAL 2 EMPTY YUNG FILE
+
+
         if (!empty($file)) {
 
             if ($file && $file->getError() === UPLOAD_ERR_OK) {
@@ -154,66 +159,55 @@ class ProductController extends AppController
                 $file = fopen($path, 'r');
 
                 //transactional method para rollback if may error along the way
-                $this->Product->getConnection()->transactional(function () use ($file) {
+                //USE ISEMPTY PARA MAACCESS UNG IS EMPTY NA GINAWA SA TAAS SET AS &REFERENCE SINCE
+                // BINABAGO YUNG VALUE NG VARIABLE
+                $this->Product->getConnection()->transactional(function () use (&$file, &$isError, &$numberofloop) {
                     $firstLine = true; // Flag to skip the first line, since row 1 is header.
+                    $endLineCount = 0;
 
                     while (!feof($file)) {
                         $content = fgetcsv($file);
-                        // dd($content);
+                        $numberofloop++;
+
                         if ($firstLine) {
                             $firstLine = false;
                             continue; // di mag pproceed ung first iteration mag loloop lang ulit.
                         }
-                        //dapat mahandle ung error pag walang kasunod na data
+
+                        if ($content == null) {
+                            continue;
+                        }
+
 
                         $product = $this->Product->newEntity();
-                        // dd(count($content));
-
                         // Look for better logic to validate the csv file. 
                         if (count($content) >= 6 || count($content) <= 4) {
-                            $this->Flash->error(__('Invalid CSV file. Please, try again.'));
+                            $isError = true;
                             return false;
                         }
 
                         $this->handleCsvData($product, $content);
 
-                        if (!$this->Product->save($product)) {
-                            $this->Flash->error(__('The product could not be saved. Please, try again.'));
+
+                        if (!$this->Product->save($product) && $endLineCount >= 2) {
+                            $isError = true;
                             return false;
                         }
                     }
-                    $this->Flash->success(__('Csv file has been imported.'));
-                    return true;
+                    return $isError ? false : true;
                 });
 
                 fclose($file);
-            } else {
-                $csv = $this->request->getData('text');
-                // dd(str_getcsv($csv, "\n"));
-                $csv_rows = str_getcsv($csv, "\n");
-                //remove header
-                $header = array_shift($csv_rows);
-
-
-
-                $this->Product->getConnection()->transactional(function () use ($csv_rows) {
-
-                    foreach ($csv_rows as $row) {
-                        $data = str_getcsv($row);
-
-                        $product = $this->Product->newEntity();
-                        $this->handleCsvData($product, $data);
-                        if (!$this->Product->save($product)) {
-                            $this->Flash->error(__('The product could not be saved. Please, try again.'));
-                            return false;
-                        }
-                    }
-                    $this->Flash->success(__('Pasted csv text has been imported.'));
-                    return true;
-                });
             }
 
-            $this->redirect(['action' => 'index']);
+            // dd($isError || $numberofloop <= 2);
+            // VALIDATE IF NUMBER OF LOOP IS LESS THAN 2 ITERATION FOR SURE EMPTY YUNG FILE
+            if ($isError || $numberofloop <= 2) {
+                $this->Flash->error(__('There was an error importing the file. Please try again.'));
+            } else {
+                $this->Flash->success(__('csv file has been imported successfully.'));
+                $this->redirect(['action' => 'index']);
+            }
         }
 
         $this->set('file', $file);
@@ -221,10 +215,22 @@ class ProductController extends AppController
 
     public function export()
     {
+        $_header = ['product_id', 'name', 'description', 'price', 'stock_quantity', 'category'];
+
         $this->response->withDownload('products.csv');
-        $data = $this->Product->find('all')->toArray();
+        $data = $this->Product->find('all')->select($_header)->toArray();
         $_serialize = 'data';
-        $_header = ['product_id', 'name', 'description', 'price', 'stock_quantity', 'category', 'image_url', 'created_at'];
+        $this->set(compact('data', '_serialize', '_header'));
+        $this->viewBuilder()->setClassName('CsvView.Csv');
+        return;
+    }
+
+    public function template()
+    {
+        $this->response->withDownload('products_template.csv');
+        $_header = ['name', 'description', 'price', 'stock_quantity', 'category'];
+        $data = [];
+        $_serialize = 'data';
         $this->set(compact('data', '_serialize', '_header'));
         $this->viewBuilder()->setClassName('CsvView.Csv');
         return;
@@ -263,7 +269,8 @@ class ProductController extends AppController
     {
         //PROCEED WITH THE MANUAL QUERY FOR THE DATATABLES
         //CHECK SA NETWORK TAB UNG PAYLOAD ANDON MGA DETAILS NG DATATABLES REQUEST
-        //YUNG IBANG MGA GAMIT FOR SORTING PAGINATION ETC UN UNG MGA NAKA GETQUERY SA REQUEST LIKE ORDER START LENGTH ETC
+        // YUNG IBANG MGA GAMIT FOR SORTING PAGINATION ETC UN UNG MGA NAKA GETQUERY SA REQUEST LIKE ORDER START LENGTH ETC
+
         //COLUMNS
         // 0 - product_id
         // 1 - name
