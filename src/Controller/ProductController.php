@@ -63,6 +63,7 @@ class ProductController extends AppController
      */
     public function view($id = null)
     {
+
         $product = $this->Product->get($id, [
             'contain' => [],
         ]);
@@ -109,8 +110,9 @@ class ProductController extends AppController
             'contain' => [],
         ]);
 
-        if ($this->request->is(['patch', 'post', 'put'])) {
 
+
+        if ($this->request->is('PUT')) {
             $product->image_url =  $this->handleFile($this->request->getUploadedFile('image'));
             $product = $this->Product->patchEntity($product, $this->request->getData());
 
@@ -146,69 +148,36 @@ class ProductController extends AppController
 
     public function import()
     {
+        $file = $this->request->getData('file');
 
-        $file = $this->request->getUploadedFile('file');
-        $isError = false; //EMPTY FLAG SET TO TRUE IF EMPTY TAS VALIDATE FOR ERROR FLASH
-        $numberofloop = 0; // COUNTER FOR NUMBER OF LOOP PAG LESS THAN OR EQUAL 2 EMPTY YUNG FILE
+        if ($file) {
+            $tmp = $file['tmp_name'];
+            $handle = fopen($tmp, 'r');
 
+            if ($handle) {
+                if (fgetcsv($handle, 1000, ',') === false) {
+                    $this->Flash->error(__('Failed to read CSV file.'));
+                    $this->redirect(['action' => 'index']);
+                    return;
+                }
 
-        if (!empty($file)) {
-
-            if ($file && $file->getError() === UPLOAD_ERR_OK) {
-                $path = WWW_ROOT . 'uploads' . DS . 'csv' . DS . $file->getClientFilename();
-                $file->moveTo($path);
-                $file = fopen($path, 'r');
-
-                //transactional method para rollback if may error along the way
-                //USE ISEMPTY PARA MAACCESS UNG IS EMPTY NA GINAWA SA TAAS SET AS &REFERENCE SINCE
-                // BINABAGO YUNG VALUE NG VARIABLE
-                $this->Product->getConnection()->transactional(function () use (&$file, &$isError, &$numberofloop) {
-                    $firstLine = true; // Flag to skip the first line, since row 1 is header.
-
-
-                    while (!feof($file)) {
-                        $content = fgetcsv($file);
-                        $numberofloop++;
-
-                        if ($firstLine) {
-                            $firstLine = false;
-                            continue; // di mag pproceed ung first iteration mag loloop lang ulit.
-                        }
-
-                        if ($content == null) {
-                            continue;
-                        }
-
-
+                while (($row = fgetcsv($handle, 1000, ',')) !== false) {
+                    if ($row) {
                         $product = $this->Product->newEntity();
-                        // Look for better logic to validate the csv file. 
-                        if (count($content) > 5 || count($content) < 5) {
-                            $isError = true;
-                            return false;
-                        }
-
-                        $this->handleCsvData($product, $content);
-
-
+                        $this->handleCsvData($product, $row);
                         if (!$this->Product->save($product)) {
-                            $isError = true;
-                            return false;
+                            $this->Flash->error(__('There was an error importing the file. Please try again.'));
                         }
                     }
-                    return $isError ? false : true;
-                });
+                }
 
-                fclose($file);
-            }
-
-            // dd($isError || $numberofloop <= 2);
-            // VALIDATE IF NUMBER OF LOOP IS LESS THAN 2 ITERATION FOR SURE EMPTY YUNG FILE
-            if ($isError || $numberofloop <= 2) {
-                $this->Flash->error(__('There was an error importing the file. Please try again.'));
+                fclose($handle);
             } else {
-                $this->Flash->success(__('csv file has been imported successfully.'));
-                $this->redirect(['action' => 'index']);
+                $this->Flash->error(__('Failed to open CSV file.'));
             }
+            $this->Flash->success(__('CSV file has been imported successfully.'));
+
+            $this->redirect(['action' => 'index']);
         }
 
         $this->set('file', $file);

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Test\Fixture;
 
 use Cake\TestSuite\Fixture\TestFixture;
@@ -47,14 +48,14 @@ class ProductFixture extends TestFixture
     {
         $this->records = [
             [
-                'product_id' => 1,
+                // 'product_id' => 1,
                 'name' => 'Lorem ipsum dolor sit amet',
                 'description' => 'Lorem ipsum dolor sit amet, aliquet feugiat. Convallis morbi fringilla gravida, phasellus feugiat dapibus velit nunc, pulvinar eget sollicitudin venenatis cum nullam, vivamus ut a sed, mollitia lectus. Nulla vestibulum massa neque ut et, id hendrerit sit, feugiat in taciti enim proin nibh, tempor dignissim, rhoncus duis vestibulum nunc mattis convallis.',
                 'price' => 1.5,
                 'stock_quantity' => 1,
                 'category' => 'Lorem ipsum dolor sit amet',
                 'image_url' => 'Lorem ipsum dolor sit amet',
-                'created_at' => 1707972798,
+                // 'created_at' => 1707972798,
             ],
         ];
         parent::init();
